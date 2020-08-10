@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+sys.path.append('sp_tool/')
 import glob
 import tempfile
 import numpy as np

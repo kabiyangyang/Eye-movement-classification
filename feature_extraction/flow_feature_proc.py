@@ -52,7 +52,7 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
     and gaze moving direction distances
     """
 
-    #t = arr_b_c[5:len(arr_b_c)-4]
+    # do moving average for both x and y for gaze and flow
     x = moving_average_2(arr_x, 10)
     y = moving_average_2(arr_y, 10)
     flow_x = moving_average_2(fx, 10)
@@ -62,7 +62,7 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
     tmp2 = np.vstack((flow_x, flow_y)).T
     
     outputdata = np.hstack((tmp1, tmp2))
-    
+    #apply temproal scales 
     for window_width in window_width_interval:
         step = window_width/2
         f_dir = []
@@ -85,7 +85,7 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
                 f_dir.append(0)
                 p_dir.append(0)
                 continue
-            
+            #calculate arctan, bc it won't produce nan values
             tmp_f_dir = np.arctan2(np.sum(flow_y[startPos:endPos]), np.sum(flow_x[startPos:endPos]) )
             tmp_p_dir = np.arctan2((y[endPos]-y[startPos]), (x[endPos] - x[startPos]))
                       
@@ -96,7 +96,7 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
         res = np.asarray(f_dir) - np.asarray(p_dir)
         
         d_res = np.degrees(res)
-        
+        # remapping the valune into -pi to pi
         d_res[d_res>180] = 360 - d_res[d_res>180]
         d_res[d_res<-180] = (-360) - d_res[d_res<-180]
         
@@ -128,6 +128,7 @@ def run(args):
         vidlist = []
         video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
         count = 0
+        
         while cap.isOpened():
             # Extract the frame
             ret, frame = cap.read()
@@ -135,11 +136,13 @@ def run(args):
             count+=1
             if (count > (video_length-1)):
                 cap.release()
-                break            
+                break  
+        # input the motion segmentation masks/ mask rcnn masks          
         mask_path = args.mask_path +'/'+ v + '/seg/final_mask_arr.npy'
         mask_all = np.load(mask_path, allow_pickle = True)
         for sub in subjects:
             s = sub[0:4]
+            # load feature files
             txtloc = args.gt_path + v + '/'+ s + v+'.arff'
             outloc =  outputfolder + s + v+ '.arff'
             
@@ -150,26 +153,31 @@ def run(args):
             alldatalist = []
             of_path = args.flow_path +'/'+ v +'/'
             length = len(os.listdir(of_path))
+
             for f in np.arange(length):
+                #exclude the gaze points between frames
                 partdata = alldata[np.where((timeline>1e6*f/fps)&(timeline<1e6*(f+1)/fps))]
+
+                #calculate mean value of the gaze in each frame (since it has multiples)
                 tmp_posi = np.mean(partdata[:,1:3], axis=0)
                 mask = mask_all[f]
               
+                # get the nearest average flow
                 fx, fy = flow_calculation.find_flow(mask, of_path, f, tmp_posi, partdata[:,1:3].shape[0])
                 tmp_flow = np.vstack((fx, fy)).T
                 
                 partdatawithflow = np.hstack((partdata, tmp_flow))
-    
+                #process into the feature files
                 alldatalist.extend(partdatawithflow)
             test = np.copy(alldatalist)
             cl = test[:,6]
-                
+            #apply preprocessing on dataset
             preprocessed_x, preprocessed_y = preproc.preprocessing(cl, test[:,1], test[:,2], 250, 0.0374)
             test[:,1] = np.copy(preprocessed_x)
             test[:,2] = np.copy(preprocessed_y)
 
             
-                
+             #apply sliding window to calculate different temproal scales   
             finaldata = slidingwindow(test[:,1], test[:,2], test[:,7], test[:,8], args.feature_scales)
             
             #bc moving average filter length was set 10, here was set 10 elements less accordingly

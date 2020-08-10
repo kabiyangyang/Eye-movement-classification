@@ -9,7 +9,7 @@ Created on Sun Jun 28 17:22:35 2020
 """
 
 
-import cv2
+#import cv2
 import numpy as np
 
 
