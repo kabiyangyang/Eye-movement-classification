@@ -50,18 +50,18 @@ def parse_arguments():
 
     parser = ArgumentParser('flow feature processing')
 
-    parser.add_argument('--gt-path',  default= 'G:/hollywood2_em-master/hollywood2_em/ground_truth/test/',#D:/deep_em_classifier-master/deep_em_classifier-master/GazeCom/ground_truth/',
+    parser.add_argument('--gt-path',  default= 'D:/deep_em_classifier-master/deep_em_classifier-master/GazeCom/ground_truth/',#'D:/deep_em_classifier-master/deep_em_classifier-master/GazeCom/ground_truth/',#D:/deep_em_classifier-master/deep_em_classifier-master/GazeCom/ground_truth/',
                         help='The path that contains the ground truth data with hand labeled classes')
-    parser.add_argument('--flow-path', default= 'H:/flow/',#'H:/of_data/',
+    parser.add_argument('--flow-path', default= 'H:/of_data/',#'H:/of_data/',
                         help='The path that contains the flow data')
-    parser.add_argument('--video-path', default='H:/Hollywood2-actions/test/', #'E:/movies-m2t/',#'G:/Hollywood2-actions/test/',#'H:/EyeMovementDetectorEvaluation/EyeMovementDetectorEvaluation/Stimuli/videos/',#'D:/Masks/propagated_masks/',
+    parser.add_argument('--video-path', default='E:/movies-m2t/', #'E:/movies-m2t/',#'G:/Hollywood2-actions/test/',#'H:/EyeMovementDetectorEvaluation/EyeMovementDetectorEvaluation/Stimuli/videos/',#'D:/Masks/propagated_masks/',
                         help='Folder containing the video stimuli.')
-    parser.add_argument('--mask-path', default= 'H:/hollywood2_mask/',#'H:/gazeCom_mask/', 
+    parser.add_argument('--mask-path', default= 'H:/gazeCom_mask/',#'H:/gazeCom_mask/', 
                         help='Folder containing the masks.')
-    parser.add_argument('--output-path',  default='D:/processed_data/hollywood2_features/',
+    parser.add_argument('--output-path',  default='../data/hollywood2_features/',
                         help='Folder containing the output data.')
     
-    parser.add_argument('--feature-scales', nargs='+', default=[48, 64], type=int,
+    parser.add_argument('--feature-scales', nargs='+', default=[8, 16, 24, 32], type=int,
                         help='temproal scales for the flow and gaze moving direction distances')
     
     parser.add_argument('--pre-processing', dest='pre_processing', action='store_true',
@@ -93,7 +93,7 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
     Param arr_y: gaze position in Y
     Param fx: flow trajectory in x
     Param fy: flow trajectory in y
-    Param window_width_interval: user defined temproal scales for flow 
+    Param window_width_interval: user defined temproal scales for direction difference (prefer a coarser scale than other features)
     and gaze moving direction distances
     """
 
@@ -142,8 +142,8 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
         
         d_res = np.degrees(res)
         
-        d_res[d_res>180] = 360 - d_res[d_res>180]
-        d_res[d_res<-180] = (-360) - d_res[d_res<-180]
+        d_res[d_res>180] = d_res[d_res>180] - 360
+        d_res[d_res<-180] = d_res[d_res<-180] + 360
         
         
         outputdata = np.hstack((outputdata, d_res.reshape(-1,1)))
@@ -163,25 +163,25 @@ def run(args):
     
     fps = 30
     videos_run = os.listdir(args.video_path)
-   # videos_run = ['st_petri_market.m2t']
     for video in videos_run:
         
         # video name
         v = os.path.splitext(video)[0] 
         
         
-        if(v[0] == '.' or v == 'actioncliptest00196'):
+        if(v[0] == '.'):
             continue
         
         videoloc = args.video_path + video
         outputfolder = args.output_path + v + '/'
         
+        #if no output path, create
         if not os.path.exists(args.output_path):
             os.mkdir(args.output_path)
         
         if not os.path.exists(outputfolder):
             os.mkdir(outputfolder)
-            
+        #read in the frames  
         cap = cv2.VideoCapture(videoloc)
         vidlist = []
         video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
@@ -196,10 +196,12 @@ def run(args):
                 break         
 
         mask_path = args.mask_path + v + '/final_mask_arr.h5'
-        of_path = args.flow_path + v  + '/' # args.mask_path + v +'/' + 'flow.h5'
+        of_path = args.flow_path + v  + '/'
         
         of_files = os.listdir(of_path)
         suffix = os.path.splitext(of_files[0])[1]
+        
+        #choose whether the optical flow data is saved in '*.flo' or '*.h5'
         flo_flag = -1
         if(suffix == '.flo'):
             flo_flag = 1
@@ -216,13 +218,20 @@ def run(args):
             
             
             
-            arffdata = arff.load(open(txtloc, 'r'))          
-           # data = np.array(arffdata['data'], dtype = 'float32')
-            
-            data = np.array(arffdata['data'])
-            for i in [-1, -2]:
-                data[:, i] = list(map(lambda x: translate_dict[x], data[:,i]))
-            data = data.astype('float32')
+            arffdata = arff.load(open(txtloc, 'r'))      
+            first_line = arffdata['data'][0]
+            str_label_idx = []
+            for i in range(0, len(first_line)):
+                if isinstance(first_line[i], str):
+                    str_label_idx.append(i)
+                
+            if(len(str_label_idx) == 0):
+                data = np.array(arffdata['data'], dtype = 'float32')
+            else:
+                data = np.array(arffdata['data'])
+                for i in str_label_idx:
+                    data[:, i] = list(map(lambda x: translate_dict[x], data[:,i]))
+                data = data.astype('float32')
             
             tmp_str = ''  
             with open(txtloc, "r") as f:
@@ -255,6 +264,7 @@ def run(args):
             for f in np.arange(0, length-1):
                 partdata = alldata[np.where((timeline>=1e6*f/fps)&(timeline<1e6*(f+1)/fps))]
                 partdata2 = alldata[np.where((timeline>=1e6*(f+1)/fps)&(timeline<1e6*(f+2)/fps))]
+                #calculate the mean position
                 tmp_posi = np.mean(partdata[:, [find_listoftuple(attributes, 'x'), find_listoftuple(attributes, 'y')]], axis=0)
                 tmp_posi2 = np.mean(partdata2[:, [find_listoftuple(attributes, 'x'), find_listoftuple(attributes, 'y')]], axis = 0)
     
@@ -272,7 +282,7 @@ def run(args):
                         flow = k['data'][f]
                 
                 
-                
+                # matching the target, either in velocity space or in pixel space
                 if(args.velocity_space):
                     flow = flow_calculation.find_flow_similar(mask,  tmp_posi, partdata.shape[0], vel, flow)
                 else:
@@ -283,28 +293,21 @@ def run(args):
                 alldatalist.extend(coord_flow)
  
             alldata_with_flow = np.copy(alldatalist)  
-            
+            #feature scale for direction difference computation
             finaldata = slidingwindow(alldata_with_flow[:,find_listoftuple(attributes, 'x')], alldata_with_flow[:,find_listoftuple(attributes, 'y')], alldata_with_flow[:,-2], alldata_with_flow[:,-1], args.feature_scales)
            
             res = np.hstack((alldata_with_flow[4:alldata_with_flow.shape[0]-4][:,:-2],finaldata[:,2:]))
             
-                
-            #for hollywood 2
-            tuple_hand1 = ('handlabeller_1', 'INTEGER')
-            tuple_hand2 = ('handlabeller_final', 'INTEGER')
-            
-            attributes[4] = tuple_hand1
-            attributes[5] = tuple_hand2
+            # add attributes and save the arff files    
+            if(len(str_label_idx) != 0):
+                for idx in str_label_idx:
+                    tuple_label = (attributes[idx][0], 'INTEGER')
+                    attributes[idx] = tuple_label
             
             flow_ref = [('flow_x', 'NUMERIC'), ('flow_y', 'NUMERIC'),]
             
             for i in args.feature_scales:
                 flow_ref.append(('dir_dis_' + str(i), 'NUMERIC' ))
-            
-            
-         
-            
-            
             
             
             attributes += flow_ref
