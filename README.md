@@ -15,6 +15,8 @@ Here is the `default` architecture of their work(as introduced in the paper):
 
 Based on their architecture, we added an additional BLSTM layer.
 
+If u have any questions, do not hesitate to send me E-Mails via kabiyangyang912@gmail.com
+
 
 # DEPENDENCIES
 
@@ -32,10 +34,13 @@ If you want to use blstm_model.py script (to train/test models on GazeCom -- dat
 * keras 2.4.3 with tensorflow 2.2.0 backend : network building, training as well aspredicting.
 * Numpy 1.19.1: regular computing.
 * h5py 2.10.0: reading and saving models
+* OpenCV-Python 4.4.0 : image processing
 
 # USAGE
 
 1. First, target motion extraction needs the previous knowledge of the instance segmentation masks as well as the optical flow, possible ways are  [Mask-RCNN](https://github.com/facebookresearch/Detectron) and [PWC-Net](https://github.com/NVlabs/PWC-Net), the masks need to be saved as `*.h5` files and the optical flow can be saved either as `*.flo` or as `*.h5` files. In our case, we set the path to save the masks as `/video_name/final_mask_arr.h5`, the flow can be save either as `/video_name/flow.h5` to save all the optical flow across the video or `/video_name/00001.flo` for the optical flow within each frame. But these also can be changed in line 199 and 200.
+
+2. If the quality of the mask is not promising, try `feature_extraction/Mask_propagation.py` to propagate the masks according to the optical flow.
 
 2. By specifying the arguments of mask path, video path, optical flow path, ground truth path as well as the outputpath, the output `*.arff` files will be created within the output folder. Afterwards, these files can be further used for the matlab files same as in the baseline method. 
 
