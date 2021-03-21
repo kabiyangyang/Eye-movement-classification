@@ -9,8 +9,8 @@
 function AnnotateData(arffFile, outputFile)
     addpath('arff_utils')
 
-    %windowsSize = [1 2 4 8 16];
-    windowsSize = [2 4 8 16 32];
+    windowsSize = [1 2 4 8 16];
+    %windowsSize = [2 4 8 16 32];
     [data, metadata, attributes, relation, comments] = LoadArff(arffFile);
     comments{end+1} = 'The number after speed, direction denotes the step size that was used for the calculation.';
     comments{end+1} = 'Acceleration was calculated between two adjacent samples of the already low pass filtered velocity';
