@@ -22,7 +22,10 @@ import math
 from copy import deepcopy
 import itertools
 import warnings
+import sys
+sys.path.append('sp_tool/')
 
+from sklearn.utils.class_weight import compute_class_weight
 from sp_tool import util as sp_util
 from sp_tool.arff_helper import ArffHelper
 from sp_tool.evaluate import CORRESPONDENCE_TO_HAND_LABELLING_VALUES
@@ -91,7 +94,51 @@ def f1_SP(y_true, y_pred, dtype=None):
     return categorical_f1_score_for_class(y_true, y_pred, 3, dtype)
 
 
-def create_model(num_classes, batch_size, train_data_shape, dropout_rate=0.3,
+def weightedLoss(originalLossFunc, weightsList):
+
+    def lossFunc(true, pred):
+
+        axis = -1 
+
+
+        #argmax returns the index of the element with the greatest value
+        #done in the class axis, it returns the class index    
+        classSelectors = K.argmax(true, axis=axis) 
+        tmp_classSelectors = []
+            #if your loss is sparse, use only true as classSelectors
+
+        #considering weights are ordered by class, for each class
+        #true(1) if the class index is equal to the weight index   
+        for i in [0,1,2,3,4]:
+            i = K.cast(i, 'int64')
+            tmp_classSelectors.append(K.equal(i, classSelectors))
+
+        #casting boolean to float for calculations  
+        #each tensor in the list contains 1 where ground true class is equal to its index 
+        #if you sum all these, you will get a tensor full of ones. 
+        tmp_classSelectors = [K.cast(x, K.floatx()) for x in tmp_classSelectors]
+
+        #for each of the selections above, multiply their respective weight
+        weights = [sel * w for sel,w in zip(tmp_classSelectors, weightsList)] 
+
+        #sums all the selections
+        #result is a tensor with the respective weight for each element in predictions
+        weightMultiplier = weights[0]
+        for i in range(1, len(weights)):
+            weightMultiplier = weightMultiplier + weights[i]
+
+
+        #make sure your originalLossFunc only collapses the class axis
+        #you need the other axes intact to multiply the weights tensor
+        loss = originalLossFunc(true,pred) 
+        loss = loss * weightMultiplier
+
+        return loss
+    return lossFunc
+
+
+
+def create_model(num_classes, batch_size, train_data_shape, weights,args, dropout_rate=0.3,
                  padding_mode='valid',
                  num_conv_layers=3, conv_filter_counts=(32, 16, 8),
                  num_dense_layers=1, dense_units_count=(32,),
@@ -201,12 +248,25 @@ def create_model(num_classes, batch_size, train_data_shape, dropout_rate=0.3,
     model.add(TimeDistributed(Dense(num_classes, activation='softmax',
                                     kernel_initializer=KI.RandomNormal(),
                                     bias_initializer=KI.Ones())))
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='adam', metrics=['accuracy',
-                                                f1_SP,
-                                                f1_FIX,
-                                                f1_SACC])
+    
+    if(args.weighted):
+        print('***********************')
+        print('Using weighted categorical cross entropy')
+        print('*************************')
+        model.compile(loss= weightedLoss(K.categorical_crossentropy, weights),
+                      optimizer='rmsprop', metrics=['accuracy',
+                                                    f1_SP,
+                                                    f1_FIX,
+                                                    f1_SACC])   
+    else:
+        
+        model.compile(loss= 'categorical_crossentropy',
+              optimizer='rmsprop', metrics=['accuracy',
+                                            f1_SP,
+                                            f1_FIX,
+                                            f1_SACC])                      
+                                               
+    
     model.summary()
     return model
 
@@ -487,7 +547,8 @@ def get_arff_attributes_to_keep(args):
     keys_to_keep = []
     if 'xy' in args.features:
         keys_to_keep += ['x', 'y']
-
+    if 'dist' in args.features:
+        keys_to_keep += ['dist']
     if 'speed' in args.features:
         keys_to_keep += ['speed_{}'.format(i) for i in (1, 2, 4, 8, 16)[:args.num_feature_scales]]
     if 'direction' in args.features:
@@ -496,13 +557,13 @@ def get_arff_attributes_to_keep(args):
         keys_to_keep += ['acceleration_{}'.format(i) for i in (1, 2, 4, 8, 16)[:args.num_feature_scales]]
     
     if 'dir_dis' in args.features:
-        keys_to_keep += ['dir_dis_{}'.format(i) for i in (8, 16, 24, 32)[2:4]]#[:args.num_feature_scales]]
+        keys_to_keep += ['dir_dis_{}'.format(i) for i in (8, 16, 24, 32)[2 : ]]
     
     if 'flow_speed' in args.features:
         keys_to_keep += ['flow_speed_{}'.format(i) for i in (1, 2, 4, 8, 16)[:args.num_feature_scales]]
         
-    if 'speed_dis' in args.features:
-        keys_to_keep += ['speed_dis_{}'.format(i) for i in (1, 2, 4, 8, 16)[:args.num_feature_scales]]
+    if 'flow_dir' in args.features:
+        keys_to_keep += ['flow_dir_{}'.format(i) for i in (1, 2, 4, 8, 16)[:args.num_feature_scales]]
 
     return keys_to_keep
 
@@ -642,7 +703,10 @@ def run(args):
 
         time_scale = 1e-6  # time is originally in microseconds; scale to seconds
 
+
+
         total_files = 0
+        #augmented = 0
         for video_name in gc['video_names']:
             print('For {} using files from {}'.format(video_name, files_template.format(video_name)))
             fnames = sorted(glob.glob(files_template.format(video_name)))
@@ -680,11 +744,19 @@ def run(args):
 
                 # add to respective data sets (only the features to be used and the true labels)
                 data_X[-1].append(np.hstack([np.reshape(o['data'][key], (-1, 1)) for key in keys_to_keep]).astype(np.float64))
+           
+                if(args.augmented):
+                    data_X[-1].append(np.hstack([np.reshape(o['data'][key][::-1], (-1, 1)) for key in keys_to_keep]).astype(np.float64))
+
                 assert data_X[-1][-1].dtype == np.float64
                 if 'time' in keys_to_keep:
                     data_X[-1][-1][:, keys_to_keep.index('time')] *= time_scale
                 data_Y[-1].append(o['data']['handlabeller_final'])  # "true" labels
-                data_Y_one_hot[-1].append(np.eye(num_classes)[data_Y[-1][-1]])  # convert numeric labels to one-hot form
+                data_Y_one_hot[-1].append(np.eye(num_classes)[data_Y[-1][-1].astype('int64')])  # convert numeric labels to one-hot form
+                
+                if(args.augmented):
+                    data_Y[-1].append(o['data']['handlabeller_final'][::-1])
+                    data_Y_one_hot[-1].append(np.eye(num_classes)[data_Y[-1][-1].astype('int64')])
 
         if total_files > 0:
             print('Loaded a total of {} files'.format(total_files))
@@ -814,6 +886,9 @@ def run(args):
             # assemble the entire training set
             train_X = np.concatenate(train_X)
             train_Y = np.concatenate(train_Y)
+            class_matrix = np.argmax(train_Y, axis = -1)
+            tmp_weights = compute_class_weight('balanced', np.unique(class_matrix), class_matrix.ravel())
+            final_weights = [0.0, tmp_weights[0], tmp_weights[1], tmp_weights[2], tmp_weights[3]]
 
             # if fine-tuning, load a pre-trained model; if not - create a model from scratch
             if args.initial_epoch:
@@ -825,7 +900,9 @@ def run(args):
             else:
                 model = create_model(num_classes=num_classes, batch_size=args.batch_size,
                                      train_data_shape=train_X.shape,
+                                     args = args,
                                      dropout_rate=0.3,
+                                     weights = final_weights,
                                      padding_mode=args.conv_padding_mode,
                                      num_conv_layers=args.num_conv, conv_filter_counts=args.conv_units,
                                      num_dense_layers=args.num_dense, dense_units_count=args.dense_units,
@@ -869,8 +946,7 @@ def run(args):
         raw, processed = evaluate_test(model, data_X[i], data_Y_one_hot[i],
                                        keys_to_subtract_start_indices=keys_to_subtract_start_indices,
                                        padding_features=padding_features,
-                                       split_by_items=args.final_run)  # keep sequences of different observers separate,
-                                                                       # if we still need to write output .arff files
+                                       split_by_items=args.final_run)                                             # if we still need to write output .arff files
 
         # store all results (raw and processed)
         for k in raw_results.keys():
@@ -927,8 +1003,7 @@ def run(args):
                                                    default_value=sp_processor.EM_TYPE_DEFAULT_VALUE)
                 # fill in with categorical values instead of numerical ones
                 # (use @CORRESPONDENCE_TO_HAND_LABELLING_VALUES_REVERSE for conversion)
-                source_obj['data'][sp_processor.EM_TYPE_ATTRIBUTE_NAME] = \
-                    map(lambda x: CORRESPONDENCE_TO_HAND_LABELLING_VALUES_REVERSE[x], labels_pred)
+                source_obj['data'][sp_processor.EM_TYPE_ATTRIBUTE_NAME] =  labels_pred
 
                 ArffHelper.dump(source_obj, open(out_fname, 'w'))
 
@@ -1007,7 +1082,7 @@ def parse_args(dry_run=False):
     parser = ArgumentParser('Sequence-to-sequence eye movement classification')
     parser.add_argument('--final-run', '--final', '-f', dest='final_run', action='store_true',
                         help='Final run with testing only, but on full data (not "clean" data).')
-    parser.add_argument('--folder', '--output-folder', dest='output_folder', default='data/outputs/with_flow',
+    parser.add_argument('--folder', '--output-folder', dest='output_folder', default='data/outputs/test_1',
                         help='Only for --final-run: write prediction results as ARFF files here.'
                              'Can be set to "auto" to select automatically.')
     parser.add_argument('--model-root-path', default='data/models',
@@ -1016,7 +1091,7 @@ def parse_args(dry_run=False):
                              'automatically detected.')
 
     parser.add_argument('--feature-files-folder', '--feature-folder', '--feat-folder',
-                        default='data/inputs/GazeCom_all_features/',
+                        default= 'data/inputs/gazeCom_nearest_basic_processing_9_samples_processed/',
                         help='Folder containing the files with already extracted features.')
     parser.add_argument('--ground-truth-folder', '--gt-folder', default='data/inputs/GazeCom_ground_truth/',
                         help='Folder containing the ground truth.')
@@ -1024,17 +1099,17 @@ def parse_args(dry_run=False):
     parser.add_argument('--run-once', '--once', '-o', dest='run_once', action='store_true',
                         help='Run one step of the LOO-CV run-through and exit (helps with memory consumption,'
                              'then run manually 18 times for GazeCom, for 18 videos).')
-    parser.add_argument('--run-once-video', default=None,
+    parser.add_argument('--run-once-video', default="koenigstrasse",
                         help='Run one step of the LOO-CV run-through on the video with *this* name and exit. '
                              'Used for partial testing of the models.')
 
-    parser.add_argument('--batch-size', dest='batch_size', default=1000, type=int,
+    parser.add_argument('--batch-size', dest='batch_size', default=5000, type=int,
                         help='Batch size for training')
-    parser.add_argument('--num-epochs', '--epochs', dest='num_epochs', default=500, type=int,
+    parser.add_argument('--num-epochs', '--epochs', dest='num_epochs', default=1000, type=int,
                         help='Number of epochs')
     parser.add_argument('--initial-epoch', dest='initial_epoch', default=0, type=int,
                         help='Start training from this epoch')
-    parser.add_argument('--training-samples', dest='num_training_samples', default=30000, type=int,
+    parser.add_argument('--training-samples', dest='num_training_samples', default=50000, type=int,
                         help='Number of training samples. The default value is appropriate for windows of 65 samples, '
                              'no overlap between the windows. If window size is increased, need to set --overlap to '
                              'something greater than zero, ideally - maintain a similar number of windows. For example,'
@@ -1042,9 +1117,9 @@ def parse_args(dry_run=False):
                              'as many windows as with a window size of 65, but without overlap.\n\n'
                              'If you decide to increase the number of training samples, you will most likely have to '
                              'adjust --window-size and --overlap values!')
-    parser.add_argument('--window-size', '--window', dest='window_size', default=65, type=int,
+    parser.add_argument('--window-size', '--window', dest='window_size', default=257, type=int,
                         help='Window size for classifying')
-    parser.add_argument('--window-overlap', '--overlap', dest='overlap', default=0, type=int,
+    parser.add_argument('--window-overlap', '--overlap', dest='overlap', default=192, type=int,
                         help='Windows overlap for training data generation')
 
     parser.add_argument('--model-name', '--model', dest='model_name', default=None,
@@ -1055,7 +1130,7 @@ def parse_args(dry_run=False):
     parser.add_argument('--features', '--feat', choices=['movement',  # = speed + direction + acceleration
                                                          'speed', 'acc', 'direction','flow',
                                                          'xy', 'flow_speed', 'flow_dir', 'speed_dis', 'dir_dis'],
-                        nargs='+', default=['dir_dis' ,'flow_speed'],#'dir_dis'],#, 'flow_speed'],
+                        nargs='+', default=['speed', 'direction'],
                         help='All of the features that are to be used, can be listed without separators, e.g. '
                              '"--features speed direction". "acc" stands for acceleration; "movement" is a combination '
                              'of all movement features -- speed, direction, acceleration.')
@@ -1100,6 +1175,13 @@ def parse_args(dry_run=False):
                              'http://michaeldorr.de/smoothpursuit/sp_tool.zip as a stand-alone package, or as '
                              'part of the deep_eye_movement_classification.zip archive via '
                              'http://michaeldorr.de/smoothpursuit.')
+                             
+    parser.add_argument('--augmented', action ='store_true',
+                        help='append the backward data in order to test the augmentation.')
+                        
+    parser.add_argument('--weighted', action ='store_true',
+                        help='penalizing the weights')                    
+    
 
     if dry_run:
         return parser
