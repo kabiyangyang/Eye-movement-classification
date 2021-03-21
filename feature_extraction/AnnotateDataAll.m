@@ -1,7 +1,7 @@
 function AnnotateDataAll(arffBasepath, outBasepath)
 
-    arffBasepath = 'D:/processed_data/mn_ra/'%hollywood_no_preprocessing_nearest_test/';
-    outBasepath = 'D:/processed_data/mn_ra_processed/'%hollywood_no_preprocessing_nearest_test_processed/';
+    arffBasepath = 'D:/processed_data/mn_ra/'
+    outBasepath = 'D:/processed_data/mn_ra_processed/'
     
     outputDir = [outBasepath '/'];
 
