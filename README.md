@@ -22,9 +22,6 @@ If u have any questions, do not hesitate to send me E-Mails via kabiyangyang912@
 
 Same as in their paper, to make use of this software, you need to first install the [sp_tool](https://github.com/MikhailStartsev/sp_tool/). For its installation instructions see respective README!
 
-If you want to use blstm_model.py script (to train/test models on GazeCom -- data to be found [here](http://michaeldorr.de/smoothpursuit/)), provide the correct path to the sp_tool folder via the `--sp-tool-folder /path/to/sp_tool/` argument.
-
-
 
 
 
