@@ -1,68 +1,37 @@
-# Deep eye movement (EM) classifier: a 1D CNN-BLSTM model
+# Improving gaze event classification using computer vision
 
-This is the implementation of the deep learning approach for eye movement classification from the "1D CNN with BLSTM for automated classification of fixations, saccades, and smooth pursuits" paper. If you use this code, please cite it as
-
-    @Article{startsev2018cnn,
-        author="Startsev, Mikhail
-        and Agtzidis, Ioannis
-        and Dorr, Michael",
-        title="1D CNN with BLSTM for automated classification of fixations, saccades, and smooth pursuits",
-        journal="Behavior Research Methods",
-        year="2018",
-        month="Nov",
-        day="08",
-        issn="1554-3528",
-        doi="10.3758/s13428-018-1144-2",
-        url="https://doi.org/10.3758/s13428-018-1144-2"
-    }
-
-The full paper is freely accessible via a [SharedIt link](https://rdcu.be/bbMo3).
-
-Authors:
-
-Mikhail Startsev, Ioannis Agtzidis, Michael Dorr
-
-For feedback and collaboration you can contact Mikhail Startsev via mikhail.startsev@tum.de, or any of the authors above at\
-`< firstname.lastname > @tum.de`.
+This is the implementation of the master thesis project for eye movement classfication improved with computer vision techniques.
 
 
 # DESCRIPTION
 
-The model implemented here is a combination of one-dimensional (i.e. temporal, in our case) convolutions, fully-connected and bidirectional LSTM layers. The model is trained to classify eye movements in the eye tracking signal.
+This work is based on the previous work of [this paper](https://link.springer.com/article/10.3758/s13428-018-1144-2), we applied the same architecutre but with additional motion of the target as input features.
 
-Before being processed by the model, the signal (x and y coordinates over time; we used 250 Hz recordings of the GazeCom data set -- see [here](http://michaeldorr.de/smoothpursuit/) for its data, ca. 4.5h of eye tracking recordings in total) is pre-processed to extract speed, direction, and acceleration features. This is not a necessary step, since our architecture works well utilising just the `xy` features, but performance improves with some straightforward feature extraction.
+Before being processed by the model, the data is pre-processed to extract speed, direction, and acceleration features as well as the direction difference, object speed. 
 
-Here is our `default` architecture (as introduced in the paper): 
+Here is the `default` architecture of their work(as introduced in the paper): 
 
 ![alt text](https://github.com/MikhailStartsev/deep_em_classifier/blob/master/figures/network.png "Model architecture")
 
-We improved the architecture for ECVP'18 (see presentation slides [here](http://michaeldorr.de/smoothpursuit/ECVP2018_presentation_slides.pdf)) to include 4 convolutional layers instead of 3, no dense layers, and 2 BLSTM layers instead of 1 (both pre-trained models provided via a [link](https://drive.google.com/drive/folders/1SPGTwUKnvZCUFJO05CnYTqakv-Akdth-?usp=sharing) below, together with the data for this research).
+Based on their architecture, we added an additional BLSTM layer.
 
-Our approach delivers state-of-the-art performance in terms of fixation, saccade, and smooth pursuit detection in the eye tracking data. It is also the first deep learning approach for eye movement classification that accounts for smooth pursuits (as well as one of the very first dynamic deep learning models for eye movement detection overall).
-
-![alt text](https://github.com/MikhailStartsev/deep_em_classifier/blob/master/figures/performance_all.png "Comparison to the state of the art")
-
-
-For more details, evaluation protocol, and results -- see our paper.
 
 # DEPENDENCIES
 
-To make use of this software, you need to first install the [sp_tool](https://github.com/MikhailStartsev/sp_tool/). For its installation instructions see respective README!
+Same as in their paper, to make use of this software, you need to first install the [sp_tool](https://github.com/MikhailStartsev/sp_tool/). For its installation instructions see respective README!
 
 If you want to use blstm_model.py script (to train/test models on GazeCom -- data to be found [here](http://michaeldorr.de/smoothpursuit/)), provide the correct path to the sp_tool folder via the `--sp-tool-folder /path/to/sp_tool/` argument.
 
 
-**You will also need to download and unzip the data archive from [here](https://drive.google.com/drive/folders/1SPGTwUKnvZCUFJO05CnYTqakv-Akdth-?usp=sharing).** In particular, 
 
-* The files in `data/models` contain the pre-trained models of two different architectures: the "standard" architecture with 3 Conv1D layers, 1 dense layer, and 1 BLSTM layer (described in the main paper from above) and the improved ("final") architecture that was presented at ECVP'18 (4 Conv1D layers, 2 BLSTM layers) presentation slides can be found [here](http://michaeldorr.de/smoothpursuit/ECVP2018_presentation_slides.pdf)). Note that the "improved" architecture performs better (see paper for the evaluation of the standard model or [the project page](http://michaeldorr.de/smoothpursuit/) for the final one). 
-* The files in `data/inputs` need to be unzipped, if you want to use GazeCom data as input to the model
-* The files in `data/outputs` need to be unzipped, if you want to examine the outputs of our models without having to run it
 
 
 ## Standard package dependencies
 
-* keras (we used version 2.1.1 with tensorflow backend, version 1.4.0)
-* numpy
+* liac-arff 2.4.0: reading and writing the raw gaze data stored in arff files.
+* keras 2.4.3 with tensorflow 2.2.0 backend : network building, training as well aspredicting.
+* Numpy 1.19.1: regular computing.
+* h5py 2.10.0: reading and saving models
 
 # USAGE
 
