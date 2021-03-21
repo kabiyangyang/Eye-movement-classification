@@ -42,6 +42,6 @@ If you want to use blstm_model.py script (to train/test models on GazeCom -- dat
 
 2. If the quality of the mask is not promising, try `feature_extraction/Mask_propagation.py` to propagate the masks according to the optical flow.
 
-2. By specifying the arguments of mask path, video path, optical flow path, ground truth path as well as the outputpath, the output `*.arff` files will be created within the output folder. Afterwards, these files can be further used for the matlab files same as in the baseline method. 
+2. Run `flow_calculation_similar.py` for target motion extraction. By specifying the arguments of mask path, video path, optical flow path, ground truth path as well as the outputpath, the output `*.arff` files will be created within the output folder. Afterwards, these files can be further used for the matlab files same as in the baseline method. 
 
 
