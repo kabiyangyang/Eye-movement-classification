@@ -42,25 +42,25 @@ function [data, metadata, attributes, relation, comments] = LoadArff(arffFile)
         if (size(words,2)>1 && strcmpi(words{1,1},'@relation')==1)
             relation = lower(words{1,2});
         % check for width_px
-        elseif (size(words,2)>2 && strcmpi(words{1,1},'%@metadata')==1 && strcmpi(words{1,2},'width_px')==1)
-            metadata.width_px = str2num(words{1,3});
+        elseif (size(words,2)>2 && strcmpi(words{1,2},'@metadata')==1 && strcmpi(words{1,3},'width_px')==1)
+            metadata.width_px = str2num(words{1,4});
         % check for height_px
-        elseif (size(words,2)>2 && strcmpi(words{1,1},'%@metadata')==1 && strcmpi(words{1,2},'height_px')==1)
-            metadata.height_px = str2num(words{1,3});
+        elseif (size(words,2)>2 && strcmpi(words{1,2},'@metadata')==1 && strcmpi(words{1,3},'height_px')==1)
+            metadata.height_px = str2num(words{1,4});
         % check for width_mm
-        elseif (size(words,2)>2 && strcmpi(words{1,1},'%@metadata')==1 && strcmpi(words{1,2},'width_mm')==1)
-            metadata.width_mm = str2num(words{1,3});
+        elseif (size(words,2)>2 && strcmpi(words{1,2},'@metadata')==1 && strcmpi(words{1,3},'width_mm')==1)
+            metadata.width_mm = str2num(words{1,4});
         % check for height_mm
-        elseif (size(words,2)>2 && strcmpi(words{1,1},'%@metadata')==1 && strcmpi(words{1,2},'height_mm')==1)
-            metadata.height_mm = str2num(words{1,3});
+        elseif (size(words,2)>2 && strcmpi(words{1,2},'@metadata')==1 && strcmpi(words{1,3},'height_mm')==1)
+            metadata.height_mm = str2num(words{1,4});
         % check for distance_mm
-        elseif (size(words,2)>2 && strcmpi(words{1,1},'%@metadata')==1 && strcmpi(words{1,2},'distance_mm')==1)
-            metadata.distance_mm = str2num(words{1,3});
+        elseif (size(words,2)>2 && strcmpi(words{1,2},'@metadata')==1 && strcmpi(words{1,3},'distance_mm')==1)
+            metadata.distance_mm = str2num(words{1,4});
         % process the rest of the metadata
-        elseif (size(words,2)>2 && strcmpi(words{1,1},'%@metadata')==1)
+        elseif (size(words,2)>2 && strcmpi(words{1,2},'@metadata')==1)
             pos = size(metadata.extra,1)+1;
-            metadata.extra{pos,1} = words{1,2};
-            metadata.extra{pos,2} = words{1,3};
+            metadata.extra{pos,1} = words{1,3};
+            metadata.extra{pos,2} = words{1,4};
         % check for attributes
         elseif (size(words,2)>2 && strcmpi(words{1,1},'@attribute')==1)
             index = size(attributes,1)+1;

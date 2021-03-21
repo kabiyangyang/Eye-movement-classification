@@ -14,59 +14,58 @@ import numpy as np
 
 
 
-def find_flow(mask, path_f, frame, tmp_posi, length):
+def find_flow(mask, tmp_posi, length, flow):
             final_flow_x = []
             final_flow_y = []
-            fin_dist = []
+            
             fore_pos = np.argwhere(mask!=0)
             dist = np.linalg.norm(np.abs(fore_pos[:, [1,0]] - tmp_posi), axis = 1)
             vel_flow = np.ones(length) 
             
-            #dist = dist[dist<150]
+            #dist = dist[dist<200]
                 
             if(len(dist)!=0):   
                 val = mask[fore_pos[np.argmin(dist)][0], fore_pos[np.argmin(dist)][1]]
                     
-    
-                path_of = path_f + "{:0>5d}".format(frame) + ".flo"
                 
-                flow_x = read(path_of)[:,:,0]
-                flow_y = read(path_of)[:,:,1]
+                flow_x = flow[...,0]
+                flow_y = flow[...,1]
                 res = flow_x[np.argwhere(mask==val)[:,0], np.argwhere(mask==val)[:,1]]
                 res2 = flow_y[np.argwhere(mask==val)[:,0], np.argwhere(mask==val)[:,1]]
                 tmp_vel_x = np.mean(res)
                 tmp_vel_y = np.mean(res2)
                 final_flow_x.extend(vel_flow* tmp_vel_x/length)
                 final_flow_y.extend(vel_flow*tmp_vel_y/length)
-                fin_dist.extend(vel_flow * np.min(dist))
+                
                 
             else:
                 final_flow_x.extend(vel_flow*0)
                 final_flow_y.extend(vel_flow*0)
-                fin_dist.extend(vel_flow*0)
             
-            return final_flow_x, final_flow_y, fin_dist
+            return final_flow_x, final_flow_y
+        
+        
+        
+        
         
 
-def find_flow_similar(mask, path_f, frame, tmp_posi, length, vel):
+def find_flow_similar(mask, tmp_posi, length, vel, flow):
             final_flow_x = []
             final_flow_y = []
-            fin_dist = []
+
             fore_pos = np.argwhere(mask!=0)
             dist = np.linalg.norm(np.abs(fore_pos[:, [1,0]] - tmp_posi), axis = 1)
             vel_flow = np.ones(length) 
-            
-            #dist = dist[dist<150]
+            tmp = dist<150
+            dist = dist[tmp]
                 
             if(len(dist)!=0):   
-                tmp_vals = mask[fore_pos[dist<150][:,0], fore_pos[dist<150][:,1]]
+                tmp_vals = mask[fore_pos[tmp][:,0], fore_pos[tmp][:,1]]
                 vals = np.unique(tmp_vals)
-                    
-    
-                path_of = path_f + "{:0>5d}".format(frame) + ".flo"
                 
-                flow_x = read(path_of)[:,:,0]
-                flow_y = read(path_of)[:,:,1]
+                          
+                flow_x = flow[...,0]
+                flow_y = flow[...,1]
                 flow_vel = []
                 tmp_vel_x = 0
                 tmp_vel_y = 0
@@ -81,22 +80,22 @@ def find_flow_similar(mask, path_f, frame, tmp_posi, length, vel):
                     vel_dist = np.linalg.norm(flow_vel - vel, axis = 1)
                     res_flow_x = flow_vel[np.argmin(vel_dist)][0]
                     res_flow_y = flow_vel[np.argmin(vel_dist)][1]
-                    tmp_val = tmp_vals[np.argmin(vel_dist)]
+                    tmp_val = vals[np.argmin(vel_dist)]
                     final_flow_x.extend(vel_flow* res_flow_x /length)
                     final_flow_y.extend(vel_flow* res_flow_y/length)
-                    fin_dist.extend(vel_flow * np.min(dist[dist<150][tmp_vals == tmp_val]))
+                    
                 else:
                     final_flow_x.extend(vel_flow*0)
                     final_flow_y.extend(vel_flow*0)
-                    fin_dist.extend(vel_flow * (-1))
+ 
                     
                 
             else:
                 final_flow_x.extend(vel_flow*0)
                 final_flow_y.extend(vel_flow*0)
-                fin_dist.extend(vel_flow*(-1))
+
             
-            return final_flow_x, final_flow_y, fin_dist
+            return final_flow_x, final_flow_y
     
     
     

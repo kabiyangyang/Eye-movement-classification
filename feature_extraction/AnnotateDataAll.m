@@ -1,7 +1,8 @@
 function AnnotateDataAll(arffBasepath, outBasepath)
-    %arffBasepath = 'C:/Users/ThinkPad/Downloads/deep_em_classifier-master/deep_em_classifier-master/GazeCom/gaze_arff/'
-    arffBasepath = 'D:/deep_em_classifier-master/deep_em_classifier-master/GazeCom/ground_truth_with_flow'
-    outBasepath = 'D:/deep_em_classifier-master/deep_em_classifier-master/data/inputs/GazeCom_all_features'
+
+    arffBasepath = 'D:/processed_data/mn_ra/'%hollywood_no_preprocessing_nearest_test/';
+    outBasepath = 'D:/processed_data/mn_ra_processed/'%hollywood_no_preprocessing_nearest_test_processed/';
+    
     outputDir = [outBasepath '/'];
 
     if (exist(outputDir) ~= 7)
@@ -9,9 +10,10 @@ function AnnotateDataAll(arffBasepath, outBasepath)
     end
     tmp_folders = dir([arffBasepath '/*']);
     folders = {tmp_folders.name};
-    folders = folders(3:12);
+    folders = folders(3:length(folders));
     
-    for i = 1:10
+    for i = 1:(length(folders))
+
         tmpbasepath = [arffBasepath '/' folders{i}];
         arffFiles = glob([tmpbasepath '/*.arff']);
         

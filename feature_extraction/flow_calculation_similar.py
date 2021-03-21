@@ -22,24 +22,58 @@ import preproc
 import matplotlib.pyplot as plt
 import h5py
 
+
+
+TAG_FLOAT = 202021.25
+translate_dict = {'UNKNOWN' : 0, 'FIX':1,'SACCADE':2, 'SP':3,  "NOISE" :4}
+
+def read(file):
+
+	assert type(file) is str, "file is not str %r" % str(file)
+	assert os.path.isfile(file) is True, "file does not exist %r" % str(file)
+	assert file[-4:] == '.flo', "file ending is not .flo %r" % file[-4:]
+	f = open(file,'rb')
+	flo_number = np.fromfile(f, np.float32, count=1)[0]
+	assert flo_number == TAG_FLOAT, 'Flow number %r incorrect. Invalid .flo file' % flo_number
+	w = np.fromfile(f, np.int32, count=1)
+	h = np.fromfile(f, np.int32, count=1)
+	#if error try: data = np.fromfile(f, np.float32, count=2*w[0]*h[0])
+	data = np.fromfile(f, np.float32, count=2*w[0]*h[0])
+	# Reshape data into 3D array (columns, rows, bands)
+	flow = np.resize(data, (int(h), int(w), 2))	
+	f.close()   
+	return flow
+
+
+
 def parse_arguments():
 
     parser = ArgumentParser('flow feature processing')
 
-    parser.add_argument('--gt-path',  default='../../GazeCom/ground_truth/',
+    parser.add_argument('--gt-path',  default= 'G:/hollywood2_em-master/hollywood2_em/ground_truth/test/',#D:/deep_em_classifier-master/deep_em_classifier-master/GazeCom/ground_truth/',
                         help='The path that contains the ground truth data with hand labeled classes')
-    parser.add_argument('--flow-path', default='F:/of2/',
+    parser.add_argument('--flow-path', default= 'H:/flow/',#'H:/of_data/',
                         help='The path that contains the flow data')
-
-    parser.add_argument('--mask-path', default='D:/Masks/propagated_masks/',
-                        help='Folder containing the files with already extracted features.')
-    parser.add_argument('--output-path',  default='../../GazeCom/ground_truth_with_mostsimilarflow/',
-                        help='Folder containing the ground truth.')
+    parser.add_argument('--video-path', default='H:/Hollywood2-actions/test/', #'E:/movies-m2t/',#'G:/Hollywood2-actions/test/',#'H:/EyeMovementDetectorEvaluation/EyeMovementDetectorEvaluation/Stimuli/videos/',#'D:/Masks/propagated_masks/',
+                        help='Folder containing the video stimuli.')
+    parser.add_argument('--mask-path', default= 'H:/hollywood2_mask/',#'H:/gazeCom_mask/', 
+                        help='Folder containing the masks.')
+    parser.add_argument('--output-path',  default='D:/processed_data/hollywood2_features/',
+                        help='Folder containing the output data.')
     
-    parser.add_argument('--feature-scales', nargs='+', default=[8, 16, 24, 32], type=int,
+    parser.add_argument('--feature-scales', nargs='+', default=[48, 64], type=int,
                         help='temproal scales for the flow and gaze moving direction distances')
     
+    parser.add_argument('--pre-processing', dest='pre_processing', action='store_true',
+                        help='Preprocessing on the coordinats for feature extraction on video stimuli, the output coords remain the same.')
+    
+    parser.add_argument('--velocity-space', dest='velocity_space', action='store_true',
+                        help='Preprocessing on the coordinats for feature extraction on video stimuli, the output coords remain the same.')
+   
+   
     return parser.parse_args()
+
+
 
 
 def moving_average_2(a, n) :
@@ -51,6 +85,8 @@ def moving_average_2(a, n) :
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
+
+
 def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
     """
     Param arr_x: gaze position in X
@@ -61,12 +97,10 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
     and gaze moving direction distances
     """
 
-    #t = arr_b_c[5:len(arr_b_c)-4]
-    x = moving_average_2(arr_x, 10)
-    y = moving_average_2(arr_y, 10)
-    flow_x = moving_average_2(fx, 10)
-    flow_y = moving_average_2(fy, 10)
-    
+    x = moving_average_2(arr_x, 9)
+    y = moving_average_2(arr_y, 9)
+    flow_x = moving_average_2(fx, 9)
+    flow_y = moving_average_2(fy, 9)
     tmp1 = np.vstack((x, y)).T
     tmp2 = np.vstack((flow_x, flow_y)).T
     
@@ -78,6 +112,8 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
         p_dir = []
 
         for i  in np.arange(0,x.shape[0]):
+
+            
             if(step == window_width):
                 startPos = i - step
                 endPos = int(i)
@@ -114,6 +150,9 @@ def slidingwindow(arr_x, arr_y, fx, fy,  window_width_interval):
 
     return outputdata
 
+def find_listoftuple(list_of_tuple, element):
+    return [i for i, tupl in enumerate(list_of_tuple) if tupl[0] == element][0]
+
 
 def run(args):
     """
@@ -123,18 +162,26 @@ def run(args):
     """
     
     fps = 30
-    videos_run =  ['koenigstrasse','holsten_gate','puppies', 'roundabout', 'sea', 'st_petri_gate', 'street', 'st_petri_mcdonalds']
-   #['beach', 'breite_strasse', 'bridge_1','bridge_2', 'doves', 'ducks_children', 'golf'] #
-    #['koenigstrasse','holsten_gate', 'puppies', 'roundabout', 'sea']#= os.listdir(args.flow_path)
-    
-    for v in videos_run:
+    videos_run = os.listdir(args.video_path)
+   # videos_run = ['st_petri_market.m2t']
+    for video in videos_run:
         
-        videoloc = args.mask_path + v + '.m2t'
+        # video name
+        v = os.path.splitext(video)[0] 
+        
+        
+        if(v[0] == '.' or v == 'actioncliptest00196'):
+            continue
+        
+        videoloc = args.video_path + video
         outputfolder = args.output_path + v + '/'
+        
+        if not os.path.exists(args.output_path):
+            os.mkdir(args.output_path)
         
         if not os.path.exists(outputfolder):
             os.mkdir(outputfolder)
-        subjects = os.listdir(args.gt_path + v) 
+            
         cap = cv2.VideoCapture(videoloc)
         vidlist = []
         video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
@@ -146,76 +193,142 @@ def run(args):
             count+=1
             if (count > (video_length-1)):
                 cap.release()
-                break            
-        mask_path = args.mask_path +'MOT_'+ v + '.h5'
-        #mask_all = np.load(mask_path, allow_pickle = True)
-        with h5py.File(mask_path, "r") as f:
-            mask_all = f['data'][:]
-        for sub in subjects:
-            s = sub[0:4]
-            txtloc = args.gt_path + v + '/'+ s + v+'.arff'
-            outloc =  outputfolder + s + v+ '.arff'
-            
-            data = arff.load(open(txtloc, 'r'))
-        
-            alldata = np.array(data['data'])
-            timeline = alldata[:,0]
-            alldatalist = []
-            of_path = args.flow_path +'/'+ v +'/'
-            length = len(os.listdir(of_path))
-            for f in np.arange(length):
-                partdata = alldata[np.where((timeline>1e6*f/fps)&(timeline<1e6*(f+1)/fps))]
-                partdata2 = alldata[np.where((timeline>1e6*(f+1)/fps)&(timeline<1e6*(f+2)/fps))]
-                tmp_posi = np.mean(partdata[:,1:3], axis=0)
-                tmp_posi2 = np.mean(partdata2[:,1:3], axis = 0)
-                mask = mask_all[f]
-                vel = tmp_posi2 - tmp_posi
-                fx, fy, dist= flow_calculation.find_flow_similar(mask, of_path, f, tmp_posi, partdata[:,1:3].shape[0], vel)
-                tmp_flow = np.vstack((dist, fx, fy)).T
-               # tmp_flow = 
-                partdatawithflow = np.hstack((partdata, tmp_flow))
-    
-                alldatalist.extend(partdatawithflow)
-            test = np.copy(alldatalist)
-            cl = test[:,6]
-                
-            preprocessed_x, preprocessed_y = preproc.preprocessing(cl, test[:,1], test[:,2], 250, 0.0374)
-            test[:,1] = np.copy(preprocessed_x)
-            test[:,2] = np.copy(preprocessed_y)
+                break         
 
+        mask_path = args.mask_path + v + '/final_mask_arr.h5'
+        of_path = args.flow_path + v  + '/' # args.mask_path + v +'/' + 'flow.h5'
+        
+        of_files = os.listdir(of_path)
+        suffix = os.path.splitext(of_files[0])[1]
+        flo_flag = -1
+        if(suffix == '.flo'):
+            flo_flag = 1
+        elif(suffix == '.h5'):
+            flo_flag = 0
+        else:
+            assert(False)
             
+        subjects = os.listdir(args.gt_path + v)
+        for sub in subjects:
+     
+            txtloc = args.gt_path + v + '/'+ sub
+            outloc =  outputfolder + sub
+            
+            
+            
+            arffdata = arff.load(open(txtloc, 'r'))          
+           # data = np.array(arffdata['data'], dtype = 'float32')
+            
+            data = np.array(arffdata['data'])
+            for i in [-1, -2]:
+                data[:, i] = list(map(lambda x: translate_dict[x], data[:,i]))
+            data = data.astype('float32')
+            
+            tmp_str = ''  
+            with open(txtloc, "r") as f:
+                for line in f:
+                    if line.startswith("%@METADATA"):
+                        tmp_str += line[1:]
+                arffdata['description'] = tmp_str
+            
+            attributes = arffdata['attributes']
+            
+            timeline = data[:, find_listoftuple(attributes, 'time')]
+            
+            timeline = timeline - timeline[0]
+            
+            alldata = np.copy(data)
+            
+            #preprocessing x and y
+            if(args.pre_processing):
+                preprocessed_x, preprocessed_y = preproc.preprocessing(data[:, find_listoftuple(attributes, 'x')], data[:, find_listoftuple(attributes, 'y')], 250, 0.0374)
+                alldata[:,find_listoftuple(attributes, 'x')] = preprocessed_x
+                alldata[:,find_listoftuple(attributes, 'y')] = preprocessed_y
+            alldatalist = []
+            
+
+            if(flo_flag):
+                length = len(os.listdir(of_path))
+            else:
+                length = len(vidlist)
+            
+            for f in np.arange(0, length-1):
+                partdata = alldata[np.where((timeline>=1e6*f/fps)&(timeline<1e6*(f+1)/fps))]
+                partdata2 = alldata[np.where((timeline>=1e6*(f+1)/fps)&(timeline<1e6*(f+2)/fps))]
+                tmp_posi = np.mean(partdata[:, [find_listoftuple(attributes, 'x'), find_listoftuple(attributes, 'y')]], axis=0)
+                tmp_posi2 = np.mean(partdata2[:, [find_listoftuple(attributes, 'x'), find_listoftuple(attributes, 'y')]], axis = 0)
+    
+    
+                with h5py.File(mask_path, "r") as k:
+                    mask = k['data'][f]
+                vel = tmp_posi2 - tmp_posi
+
+                if(flo_flag):                   
+                    path_of = of_path + "{:0>5d}".format(f) + ".flo"
+                    flow = read(path_of)
+                else:
+                    path_of = of_path + 'flow.h5'
+                    with h5py.File(path_of, "r") as k:
+                        flow = k['data'][f]
                 
-            finaldata = slidingwindow(test[:,1], test[:,2], test[:,8], test[:,9], args.feature_scales)
-            
-            #bc moving average filter length was set 10, here was set 10 elements less accordingly
-            to_be_input_data = test[5:test.shape[0]-4][:,:-2]
-            
-            res = np.hstack((to_be_input_data,finaldata[:,2:]))
                 
+                
+                if(args.velocity_space):
+                    flow = flow_calculation.find_flow_similar(mask,  tmp_posi, partdata.shape[0], vel, flow)
+                else:
+                    flow = flow_calculation.find_flow(mask,  tmp_posi, partdata.shape[0], flow)
+                    
+                coord_flow = np.hstack((partdata, np.array(flow).T))
+
+                alldatalist.extend(coord_flow)
+ 
+            alldata_with_flow = np.copy(alldatalist)  
             
-            tmp_ref = data['attributes']
-            flow_ref = [('dist', 'NUMERIC'), ('flow_x', 'NUMERIC'), ('flow_y', 'NUMERIC'), ('dir_dis_8', 'NUMERIC'), ('dir_dis_16', 'NUMERIC') ,('dir_dis_24', 'NUMERIC'), ('dir_dis_32', 'NUMERIC')]
-            tmp_ref.extend(flow_ref)
+            finaldata = slidingwindow(alldata_with_flow[:,find_listoftuple(attributes, 'x')], alldata_with_flow[:,find_listoftuple(attributes, 'y')], alldata_with_flow[:,-2], alldata_with_flow[:,-1], args.feature_scales)
            
-            data['data'] = res
-            data['attributes'] = tmp_ref
+            res = np.hstack((alldata_with_flow[4:alldata_with_flow.shape[0]-4][:,:-2],finaldata[:,2:]))
+            
+                
+            #for hollywood 2
+            tuple_hand1 = ('handlabeller_1', 'INTEGER')
+            tuple_hand2 = ('handlabeller_final', 'INTEGER')
+            
+            attributes[4] = tuple_hand1
+            attributes[5] = tuple_hand2
+            
+            flow_ref = [('flow_x', 'NUMERIC'), ('flow_y', 'NUMERIC'),]
+            
+            for i in args.feature_scales:
+                flow_ref.append(('dir_dis_' + str(i), 'NUMERIC' ))
+            
+            
+         
+            
+            
+            
+            
+            attributes += flow_ref
+           
+            arffdata['data'] = res
+            arffdata['attributes'] = attributes
             f = open(outloc, 'w')
-            arff.dump(data, f)
+            arff.dump(arffdata, f)
             f.close()
             print( outloc +' is finished')
            
         
-                
-        del mask_all
-    return preprocessed_x, preprocessed_y
-        
+
+
         
 def __main__():
     args = parse_arguments()
-    m1, m2 = run(args)
-    return m1, m2
+    run(args)
+
+
+
+
 if __name__ == '__main__':
-   m1, m2 =  __main__()        
+    __main__()        
         
         
         

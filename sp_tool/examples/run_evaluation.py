@@ -224,7 +224,7 @@ if __name__ == '__main__':
                                      only_main_eye_movements=not args.all_eye_movements,
                                      microseconds_in_time_unit=args.microseconds_in_time_unit)
     if args.one_line_output:
-        print stats
+        print(stats)
     else:
         import json
-        print json.dumps(stats, sort_keys=True, separators=[',', ': '], indent=4)
+        print(json.dumps(stats, sort_keys=True, separators=[',', ': '], indent=4))

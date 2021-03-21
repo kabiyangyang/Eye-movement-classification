@@ -59,7 +59,7 @@ function [speed, direction flowspeed flowdirection vel_distance] = GetVelocity(d
         time = (data(endPos,timeInd) - data(startPos,timeInd))/1000000;
         speed(i) = ampl/time;
         
-        amplflow = sqrt((sum(data(startPos:endPos-1, flowxInd)))^2 + (sum(data(startPos:endPos-1, flowyInd)))^2);
+        amplflow = sqrt((sum(data(startPos:endPos, flowxInd)))^2 + (sum(data(startPos:endPos, flowyInd)))^2);
         flowspeed(i) = amplflow/time;
         
         direction(i) = atan2(data(endPos,yInd)-data(startPos,yInd), data(endPos,xInd)-data(startPos,xInd));

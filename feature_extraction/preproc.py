@@ -27,7 +27,7 @@ def preprocess(
             min_blink_duration=0.02,
             dilate_nan=0.01,
             median_filter_length=0.05,
-            savgol_length=0.14,
+            savgol_length=0.036,
             savgol_polyord=2,
             max_vel=1000.0):
         """
@@ -138,7 +138,7 @@ def filter_spikes(data):
     return data
 
 
-def preprocessing(vel_all, vel_gaze_labeled, vel_gaze_labeled_2, sr, px2deg):
+def preprocessing( vel_gaze_labeled, vel_gaze_labeled_2, sr, px2deg):
 
     df = pd.DataFrame()
 

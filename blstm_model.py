@@ -22,8 +22,6 @@ import math
 from copy import deepcopy
 import itertools
 import warnings
-import sys
-sys.path.append('sp_tool/')
 
 from sp_tool import util as sp_util
 from sp_tool.arff_helper import ArffHelper
@@ -1030,7 +1028,7 @@ def parse_args(dry_run=False):
                         help='Run one step of the LOO-CV run-through on the video with *this* name and exit. '
                              'Used for partial testing of the models.')
 
-    parser.add_argument('--batch-size', dest='batch_size', default=1500, type=int,
+    parser.add_argument('--batch-size', dest='batch_size', default=1000, type=int,
                         help='Batch size for training')
     parser.add_argument('--num-epochs', '--epochs', dest='num_epochs', default=500, type=int,
                         help='Number of epochs')
@@ -1044,7 +1042,7 @@ def parse_args(dry_run=False):
                              'as many windows as with a window size of 65, but without overlap.\n\n'
                              'If you decide to increase the number of training samples, you will most likely have to '
                              'adjust --window-size and --overlap values!')
-    parser.add_argument('--window-size', '--window', dest='window_size', default=55, type=int,
+    parser.add_argument('--window-size', '--window', dest='window_size', default=65, type=int,
                         help='Window size for classifying')
     parser.add_argument('--window-overlap', '--overlap', dest='overlap', default=0, type=int,
                         help='Windows overlap for training data generation')
@@ -1057,7 +1055,7 @@ def parse_args(dry_run=False):
     parser.add_argument('--features', '--feat', choices=['movement',  # = speed + direction + acceleration
                                                          'speed', 'acc', 'direction','flow',
                                                          'xy', 'flow_speed', 'flow_dir', 'speed_dis', 'dir_dis'],
-                        nargs='+', default=['speed', 'dir_dis' ,'flow_speed'],#'dir_dis'],#, 'flow_speed'],
+                        nargs='+', default=['dir_dis' ,'flow_speed'],#'dir_dis'],#, 'flow_speed'],
                         help='All of the features that are to be used, can be listed without separators, e.g. '
                              '"--features speed direction". "acc" stands for acceleration; "movement" is a combination '
                              'of all movement features -- speed, direction, acceleration.')
